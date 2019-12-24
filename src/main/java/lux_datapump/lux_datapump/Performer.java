@@ -23,7 +23,7 @@ public class Performer {
 				int i = 1;
 				// TODO
 				for (Object o : oo) {
-					statement.setObject(i++, o);
+					i = setObject(statement, i++, o);
 				}
 				statement.addBatch();
 			};
@@ -44,6 +44,11 @@ public class Performer {
 			
 		} 
 		
+	}
+
+	private int setObject(PreparedStatement statement, int i, Object o) throws SQLException {
+		statement.setObject(i, o);
+		return i;
 	}
 
 }
