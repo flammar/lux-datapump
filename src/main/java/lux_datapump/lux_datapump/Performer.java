@@ -96,11 +96,83 @@ public class Performer {
 					Statement srcStatement = srcConn.createStatement();
 					ResultSet src = srcStatement.executeQuery(
 							MessageFormat.format("SELECT {1} FROM {0}{2}", srcTableName, colList, where));) {
-				final boolean wasNext[] = new boolean[] { true };
-				do {
-					List<List<Object>> collectData = collectData(src, wasNext);
-					perform(dstConn, dstQuery, collectData);
-				} while (wasNext[0]);
+				Iterator<List<Object>> baseIterator = new Iterator<List<Object>>() {
+					private boolean wasNext = false, wentOut = false;
+					private List<Object> current = null; 
+
+					@Override
+					public boolean hasNext() {
+						return tryNext(src);
+					}
+
+					@Override
+					public List<Object> next() {
+						if(! hasNext()) return null;
+						return current;
+					}
+
+					private boolean tryNext(ResultSet src) {
+						if(!wentOut && !wasNext) {
+							try {
+								wentOut = !src.next();
+								current = wentOut ? null : new ArrayList<>(rowToList(src));
+								wasNext = true;
+							} catch (SQLException e) {
+								wentOut=true;
+								current = null;
+							}
+						}
+						return !wentOut;
+					}
+				};
+				
+				
+				Iterator<Iterable<List<Object>>> main = new Iterator<Iterable<List<Object>>>() {
+
+					@Override
+					public boolean hasNext() {
+						return baseIterator.hasNext();
+					}
+
+					@Override
+					public Iterable<List<Object>> next() {
+						return new Iterable<List<Object>>() {
+							private int i=portionSize;
+							private Iterator<List<Object>> base = baseIterator;
+							
+							@Override
+							public Iterator<List<Object>> iterator() {
+								return new Iterator<List<Object>>() {
+									
+									@Override
+									public List<Object> next() {
+										i--;
+										return base.hasNext() ? base.next() : null;
+									}
+									
+									@Override
+									public boolean hasNext() {
+										return i >0 && base.hasNext();
+									}
+								};
+							}
+						};
+					}
+				};
+				main.forEachRemaining( data -> {
+					try {
+						perform(dstConn, dstQuery, data);
+					} catch (SQLException e) {
+						e.printStackTrace();
+					}
+				});
+				
+				
+//				final boolean wasNext[] = new boolean[] { true };
+//				do {
+//					List<List<Object>> collectData = collectData(src, wasNext);
+//					perform(dstConn, dstQuery, collectData);
+//				} while (wasNext[0]);
 
 			} finally {
 
@@ -116,30 +188,36 @@ public class Performer {
 		return cond.length() > 0 ? " WHERE " + cond : "";
 	}
 
-	private List<List<Object>> collectData(final ResultSet src, final boolean[] wasNext) throws SQLException {
-		final List<List<Object>> data = new ArrayList<>();
-		for (int i = portionSize; (wasNext[0] = src.next()) && i-- > 0;) {
-			data.add(new ArrayList<>(new AbstractList<Object>() {
+//	private List<List<Object>> collectData(final ResultSet src, final boolean[] wasNext) throws SQLException {
+//		final List<List<Object>> data = new ArrayList<>();
+//		for (int i = portionSize; (wasNext[0] = src.next()) && i-- > 0;) {
+//			AbstractList<Object> c = rowToList(src);
+//			ArrayList<Object> e = new ArrayList<Object>(c);
+//			data.add(e);
+//		}
+//		return data;
+//	}
 
-				private final int size = dstColDescs.size();
+	private AbstractList<Object> rowToList(final ResultSet src) {
+		return new AbstractList<Object>() {
 
-				@Override
-				public Object get(final int index) {
-					try {
-						return src.getObject(index + 1);
-					} catch (final SQLException e) {
-						e.printStackTrace();
-					}
-					return null;
+			private final int size = dstColDescs.size();
+
+			@Override
+			public Object get(final int index) {
+				try {
+					return src.getObject(index + 1);
+				} catch (final SQLException e) {
+					e.printStackTrace();
 				}
+				return null;
+			}
 
-				@Override
-				public int size() {
-					return size;
-				}
-			}));
-		}
-		return data;
+			@Override
+			public int size() {
+				return size;
+			}
+		};
 	}
 
 	private List<ColumnDescriptor> getColDescs(final Connection dstConn, final String tableName) throws SQLException {
@@ -175,12 +253,12 @@ public class Performer {
 	}
 
 	public List<Integer> perform(final Connection connection/* = getDatabaseConnection(); */, final String query,
-			final List<List<Object>> data) throws SQLException {
+			final Iterable<List<Object>> data) throws SQLException {
 		try (PreparedStatement statement = connection.prepareStatement(query)) {
 			for (final List<Object> oo : data) {
 				int i = 1;
 				for (final Object o : oo) {
-					i = setObject(statement, i++, o);
+					setObject(statement, i++, o);
 				}
 				statement.addBatch();
 			}
@@ -204,11 +282,8 @@ public class Performer {
 
 	}
 
-	private int setObject(final PreparedStatement statement, final int i, final Object o) throws SQLException {
-//		statement.setObject(i, o);
+	private void setObject(final PreparedStatement statement, final int i, final Object o) throws SQLException {
 		statement.setObject(i, o, dstColDescs.get(i - 1).sqlType);
-
-		return i;
 	}
 
 }
