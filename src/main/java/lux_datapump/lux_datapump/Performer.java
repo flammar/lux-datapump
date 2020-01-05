@@ -20,64 +20,21 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import lux_datapump.lux_datapump.Performer.Limit.Type;
+import lux_datapump.lux_datapump.Limit.Type;
 
 public class Performer {
-	public static class Limit {
-		public static enum Type {
-			LOWER(true, ">"), UPPER(false, "<");
-
-			public final boolean including;
-			public final String expression;
-
-			Type(final boolean including, final String expression) {
-				this.including = including;
-				this.expression = expression;
-
-			}
-		}
-
-		public final Type type;
-		public final Object value;
-		public final boolean including;
-
-		public Limit(final Type type, final Object value, final boolean including) {
-			this.type = type;
-			this.value = value;
-			this.including = including;
-		}
-
-		public Limit(final Type type, final Object value) {
-			this(type, value, type.including);
-		}
-
-		public String conditionalExpression() {
-			if (value == null)
-				return null;
-			return String.join(" ", "", type.expression + (including ? "=" : ""), "?", "");
-		}
-	}
-
 	private Integer portionSize;
 	private String srcTableName;
 	private String dstTableName;
+	/**
+	 * [<lower> -> <upper>]
+	 */
 	private Map<String, Map.Entry<Limit, Limit>> limits;
 	private String srcDataSource;
 	private String dstDataSource;
 	private List<ColumnDescriptor> dstColDescs;
 	private boolean autocommit;
 	private boolean predelete;
-
-	public static class ColumnDescriptor {
-		public final String name;
-		public final int sqlType;
-
-		public ColumnDescriptor(final String name, final int sqlType) {
-			super();
-			this.name = name;
-			this.sqlType = sqlType;
-		}
-	}
 
 	public void perform() throws SQLException {
 		String where = whereCond();
@@ -88,78 +45,19 @@ public class Performer {
 			if (predelete)
 				dstConn.createStatement().executeUpdate(String.format("DELETE FROM {0}{1}", dstTableName, where));
 			dstColDescs = getColDescs(dstConn, dstTableName);
-			final String colList = String.join(", ",
-					dstColDescs.stream().map(d -> d.name).collect(Collectors.toList()));
+			final String dstColList = String.join(", ",
+					dstColDescs.stream().map(d -> d.dstName).collect(Collectors.toList()));
+			final List<String> dstValList = dstColDescs.stream().map(d -> d.dstExpr).collect(Collectors.toList());//Collections.nCopies(dstColDescs.size(), "?");
 			final String dstQuery = MessageFormat.format("INSERT INTO {0} ( {1} ) VALUES ( {2} )", dstTableName,
-					colList, String.join(", ", Collections.nCopies(dstColDescs.size(), "?")));
+					dstColList, String.join(", ", dstValList));
+			final String srcColList = String.join(", ",
+					dstColDescs.stream().map(d -> d.srcExpr).collect(Collectors.toList()));
 			try (Connection srcConn = DriverManager.getConnection(srcDataSource);
 					Statement srcStatement = srcConn.createStatement();
 					ResultSet src = srcStatement.executeQuery(
-							MessageFormat.format("SELECT {1} FROM {0}{2}", srcTableName, colList, where));) {
-				Iterator<List<Object>> baseIterator = new Iterator<List<Object>>() {
-					private boolean wasNext = false, wentOut = false;
-					private List<Object> current = null; 
-
-					@Override
-					public boolean hasNext() {
-						return tryNext(src);
-					}
-
-					@Override
-					public List<Object> next() {
-						if(! hasNext()) return null;
-						return current;
-					}
-
-					private boolean tryNext(ResultSet src) {
-						if(!wentOut && !wasNext) {
-							try {
-								wentOut = !src.next();
-								current = wentOut ? null : new ArrayList<>(rowToList(src));
-								wasNext = true;
-							} catch (SQLException e) {
-								wentOut=true;
-								current = null;
-							}
-						}
-						return !wentOut;
-					}
-				};
-				
-				
-				Iterator<Iterable<List<Object>>> main = new Iterator<Iterable<List<Object>>>() {
-
-					@Override
-					public boolean hasNext() {
-						return baseIterator.hasNext();
-					}
-
-					@Override
-					public Iterable<List<Object>> next() {
-						return new Iterable<List<Object>>() {
-							private int i=portionSize;
-							private Iterator<List<Object>> base = baseIterator;
-							
-							@Override
-							public Iterator<List<Object>> iterator() {
-								return new Iterator<List<Object>>() {
-									
-									@Override
-									public List<Object> next() {
-										i--;
-										return base.hasNext() ? base.next() : null;
-									}
-									
-									@Override
-									public boolean hasNext() {
-										return i >0 && base.hasNext();
-									}
-								};
-							}
-						};
-					}
-				};
-				main.forEachRemaining( data -> {
+							MessageFormat.format("SELECT {1} FROM {0}{2}", srcTableName, srcColList, where));) {
+				Iterator<List<Object>> baseIterator = Utils.toIterator(src, dstColDescs.size());
+				Utils.portionize(baseIterator, this.portionSize).forEachRemaining( data -> {
 					try {
 						perform(dstConn, dstQuery, data);
 					} catch (SQLException e) {
@@ -168,12 +66,6 @@ public class Performer {
 				});
 				
 				
-//				final boolean wasNext[] = new boolean[] { true };
-//				do {
-//					List<List<Object>> collectData = collectData(src, wasNext);
-//					perform(dstConn, dstQuery, collectData);
-//				} while (wasNext[0]);
-
 			} finally {
 
 			}
@@ -188,46 +80,12 @@ public class Performer {
 		return cond.length() > 0 ? " WHERE " + cond : "";
 	}
 
-//	private List<List<Object>> collectData(final ResultSet src, final boolean[] wasNext) throws SQLException {
-//		final List<List<Object>> data = new ArrayList<>();
-//		for (int i = portionSize; (wasNext[0] = src.next()) && i-- > 0;) {
-//			AbstractList<Object> c = rowToList(src);
-//			ArrayList<Object> e = new ArrayList<Object>(c);
-//			data.add(e);
-//		}
-//		return data;
-//	}
-
-	private AbstractList<Object> rowToList(final ResultSet src) {
-		return new AbstractList<Object>() {
-
-			private final int size = dstColDescs.size();
-
-			@Override
-			public Object get(final int index) {
-				try {
-					return src.getObject(index + 1);
-				} catch (final SQLException e) {
-					e.printStackTrace();
-				}
-				return null;
-			}
-
-			@Override
-			public int size() {
-				return size;
-			}
-		};
-	}
-
 	private List<ColumnDescriptor> getColDescs(final Connection dstConn, final String tableName) throws SQLException {
-//		Statement preStt = dstConn.createStatement();
-
 		try (Statement preStt = dstConn.createStatement();
 				ResultSet executeQuery = preStt
 						.executeQuery(MessageFormat.format("SELECT * FROM {0} WHERE 0 = 1", tableName));) {
 			final ResultSetMetaData metaData = executeQuery.getMetaData();
-			final ArrayList<ColumnDescriptor> arrayList = new ArrayList<Performer.ColumnDescriptor>(
+			final ArrayList<ColumnDescriptor> arrayList = new ArrayList<ColumnDescriptor>(
 					new AbstractList<ColumnDescriptor>() {
 						int columnCount = metaData.getColumnCount();
 
@@ -248,7 +106,6 @@ public class Performer {
 					});
 			return arrayList;
 		} finally {
-			// TODO: handle finally clause
 		}
 	}
 
