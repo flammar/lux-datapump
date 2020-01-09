@@ -6,17 +6,18 @@ import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class Utils {
 
 	private Utils() {
 	}
 
-	static Iterator<List<Object>> toIterator(ResultSet src, int size) {
-			return new Iterator<List<Object>>() {
+	static Iterator<List<ValueDescriptor>> toIterator(ResultSet src, List<ColumnDescriptor> descs/*int size*/) {
+			return new Iterator<List<ValueDescriptor>>() {
 	//			private final int size = ;
 				private boolean wasNext = false, wentOut = false;
-				private List<Object> current = null; 
+				private List<ValueDescriptor> current = null; 
 	
 				@Override
 				public boolean hasNext() {
@@ -24,7 +25,7 @@ public class Utils {
 				}
 	
 				@Override
-				public List<Object> next() {
+				public List<ValueDescriptor> next() {
 					if(! hasNext()) return null;
 					return current;
 				}
@@ -33,7 +34,7 @@ public class Utils {
 					if(!wentOut && !wasNext) {
 						try {
 							wentOut = !src.next();
-							current = wentOut ? null : new ArrayList<>(rowToList(src));
+							current = wentOut ? null : new ArrayList<>(rowToList());
 							wasNext = true;
 						} catch (SQLException e) {
 							wentOut=true;
@@ -43,26 +44,35 @@ public class Utils {
 					return !wentOut;
 				}
 	
-				private AbstractList<Object> rowToList(ResultSet src) {
-					final ResultSet src1 = src;
-					return new AbstractList<Object>() {
-					
-						
-						@Override
-						public Object get(final int index) {
-							try {
-								return src1.getObject(index + 1);
-							} catch (final SQLException e) {
-								e.printStackTrace();
-							}
+				private List<ValueDescriptor> rowToList() {
+//					final ResultSet src1 = src;
+					return descs.stream().map(c-> {
+						try {
+							return ValueDescriptor.create(src, c);
+						} catch (SQLException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
 							return null;
 						}
-					
-						@Override
-						public int size() {
-							return size;
-						}
-					};
+					}).collect(Collectors.toList());
+//					return new AbstractList<Object>() {
+//					
+//						
+//						@Override
+//						public Object get(final int index) {
+//							try {
+//								return src1.getObject(index + 1);
+//							} catch (final SQLException e) {
+//								e.printStackTrace();
+//							}
+//							return null;
+//						}
+//					
+//						@Override
+//						public int size() {
+//							return descs.size();
+//						}
+//					};
 				}
 			};
 		}

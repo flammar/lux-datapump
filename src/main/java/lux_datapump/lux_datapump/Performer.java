@@ -56,7 +56,7 @@ public class Performer {
 					Statement srcStatement = srcConn.createStatement();
 					ResultSet src = srcStatement.executeQuery(
 							MessageFormat.format("SELECT {1} FROM {0}{2}", srcTableName, srcColList, where));) {
-				Iterator<List<Object>> baseIterator = Utils.toIterator(src, dstColDescs.size());
+				Iterator<List<ValueDescriptor>> baseIterator = Utils.toIterator(src, dstColDescs/*.size()*/);
 				Utils.portionize(baseIterator, this.portionSize).forEachRemaining( data -> {
 					try {
 						perform(dstConn, dstQuery, data);
@@ -111,16 +111,29 @@ public class Performer {
 	}
 
 	public List<Integer> perform(final Connection connection/* = getDatabaseConnection(); */, final String query,
-			final Iterable<List<Object>> data) throws SQLException {
+			final Iterable<List<ValueDescriptor>> data) throws SQLException {
 		try (PreparedStatement statement = connection.prepareStatement(query)) {
-			for (final List<Object> oo : data) {
-				int i = 1;
-				for (final Object o : oo) {
-					setObject(statement, i++, o);
+//			for (final List<ValueDescriptor> oo : data) {
+//				int i = 1;
+//				for (final Object o : oo) {
+//					setObject(statement, i++, o);
+//				}
+//				statement.addBatch();
+//			}
+//			;
+			data.forEach(vds -> {vds.forEach(vd->{
+				try {
+					vd.set(statement);
+				} catch (SQLException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
 				}
+			});try {
 				statement.addBatch();
-			}
-			;
+			} catch (SQLException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}});
 			final int[] executeBatch = statement.executeBatch();
 			return new AbstractList<Integer>() {
 
