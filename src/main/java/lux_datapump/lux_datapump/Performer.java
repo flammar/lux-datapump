@@ -92,8 +92,9 @@ public class Performer {
 						@Override
 						public ColumnDescriptor get(final int index) {
 							try {
-								return new ColumnDescriptor(metaData.getCatalogName(index + 1),
-										metaData.getColumnType(index + 1));
+								final int i = index + 1;
+								return new ColumnDescriptor(i, metaData.getCatalogName(i),
+										metaData.getColumnType(i));
 							} catch (final SQLException e) {
 							}
 							return null;
