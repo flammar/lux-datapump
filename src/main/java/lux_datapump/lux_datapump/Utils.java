@@ -22,10 +22,6 @@ public class Utils {
 			try {
 				throwingAccept(elem);
 			} catch (final Exception e) {
-				// Implement your own exception handling logic here..
-				// For example:
-//		            System.out.println("handling an exception...");
-				// Or ...
 				throw new RuntimeException(e);
 			}
 		}
@@ -49,9 +45,8 @@ public class Utils {
 	private Utils() {
 	}
 
-	public static Iterator<List<ValueDescriptor>> toIterator(ResultSet src, List<ColumnDescriptor> descs/* int size */) {
+	public static Iterator<List<ValueDescriptor>> toIterator(ResultSet src, List<ColumnDescriptor> descs) {
 		return new Iterator<List<ValueDescriptor>>() {
-			// private final int size = ;
 			private boolean wasNext = false, wentOut = false;
 			private List<ValueDescriptor> current = null;
 
@@ -82,34 +77,14 @@ public class Utils {
 			}
 
 			private List<ValueDescriptor> rowToList() {
-//					final ResultSet src1 = src;
 				return descs.stream().map(c -> {
 					try {
 						return ValueDescriptor.create(src, c);
 					} catch (SQLException e) {
-						// TODO Auto-generated catch block
 						e.printStackTrace();
 						return null;
 					}
 				}).collect(Collectors.toList());
-//					return new AbstractList<Object>() {
-//					
-//						
-//						@Override
-//						public Object get(final int index) {
-//							try {
-//								return src1.getObject(index + 1);
-//							} catch (final SQLException e) {
-//								e.printStackTrace();
-//							}
-//							return null;
-//						}
-//					
-//						@Override
-//						public int size() {
-//							return descs.size();
-//						}
-//					};
 			}
 		};
 	}

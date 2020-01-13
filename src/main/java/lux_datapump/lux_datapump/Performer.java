@@ -12,17 +12,11 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.MessageFormat;
-import java.util.AbstractList;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -88,23 +82,6 @@ public class Performer {
 				ResultSet executeQuery = preStt
 						.executeQuery(MessageFormat.format("SELECT * FROM {0} WHERE 0 = 1", tableName));) {
 			final ResultSetMetaData metaData = executeQuery.getMetaData();
-			// new AbstractList<ColumnDescriptor>() {
-//
-//				@Override
-//				public ColumnDescriptor get(final int index) {
-//					try {
-//						final int i = index + 1;
-//						return new ColumnDescriptor(i, metaData.getCatalogName(i), metaData.getColumnType(i));
-//					} catch (final SQLException e) {
-//					}
-//					return null;
-//				}
-//
-//				@Override
-//				public int size() {
-//					return columnCount;
-//				}
-//			};
 			final ArrayList<ColumnDescriptor> arrayList = new ArrayList<ColumnDescriptor>(list(
 					unbox(wrap((ThrowingFunction<Integer, ColumnDescriptor>) ((i) -> new ColumnDescriptor(i + 1,
 							metaData.getCatalogName(i + 1), metaData.getColumnType(i + 1))))),
@@ -122,27 +99,11 @@ public class Performer {
 				statement.addBatch();
 			}));
 			final int[] executeBatch = statement.executeBatch();
-			// new AbstractList<Integer>() {
-//
-//				@Override
-//				public Integer get(final int index) {
-//					return Integer.valueOf(executeBatch[index]);
-//				}
-//
-//				@Override
-//				public int size() {
-//					return executeBatch.length;
-//				}
-//			};
 			return list(index -> Integer.valueOf(executeBatch[index]), executeBatch.length);
 		} finally {
 
 		}
 
-	}
-
-	private void setObject(final PreparedStatement statement, final int i, final Object o) throws SQLException {
-		statement.setObject(i, o, dstColDescs.get(i - 1).sqlType);
 	}
 
 }
