@@ -52,13 +52,15 @@ public class Performer {
 																													// "?");
 			final String dstQuery = MessageFormat.format("INSERT INTO {0} ( {1} ) VALUES ( {2} )", dstTableName,
 					dstColList, String.join(", ", dstValList));
+			// sorted - for case of java.sql.ResultSet.TYPE_FORWARD_ONLY cursors
 			final String srcColList = String.join(", ",
-					dstColDescs.stream().map(d -> d.srcExpr).collect(Collectors.toList()));
+					dstColDescs.stream().sorted((cd0, cd1) -> cd0.srcIndex - cd1.srcIndex).map(d -> d.srcExpr)
+							.collect(Collectors.toList()));
 			try (Connection srcConn = DriverManager.getConnection(srcDataSource);
 					Statement srcStatement = srcConn.createStatement();
 					ResultSet src = srcStatement.executeQuery(
 							MessageFormat.format("SELECT {1} FROM {0}{2}", srcTableName, srcColList, where));) {
-				Iterator<List<ValueDescriptor>> baseIterator = Utils.toIterator(src, dstColDescs/* .size() */);
+				Iterator<List<ValueDescriptor>> baseIterator = Utils.toIterator(src, dstColDescs);
 				Utils.portionize(baseIterator, this.portionSize).forEachRemaining(wrap(data -> {
 					perform(dstConn, dstQuery, data);
 				}));
