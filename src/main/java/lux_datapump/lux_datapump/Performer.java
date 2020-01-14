@@ -48,8 +48,7 @@ public class Performer {
 			dstColDescs = getColDescs(dstConn, dstTableName);
 			final String dstColList = String.join(", ",
 					dstColDescs.stream().map(d -> d.dstName).collect(Collectors.toList()));
-			final List<String> dstValList = dstColDescs.stream().map(d -> d.dstExpr).collect(Collectors.toList());// Collections.nCopies(dstColDescs.size(),
-																													// "?");
+			final List<String> dstValList = dstColDescs.stream().map(d -> d.dstExpr).collect(Collectors.toList());
 			final String dstQuery = MessageFormat.format("INSERT INTO {0} ( {1} ) VALUES ( {2} )", dstTableName,
 					dstColList, String.join(", ", dstValList));
 			// sorted - for case of java.sql.ResultSet.TYPE_FORWARD_ONLY cursors
