@@ -2,10 +2,8 @@ package lux_datapump.lux_datapump;
 
 public class PortionedVolatileCounterImpl implements Counter {
 	public final int portion;
-	private int portionRead;
-	private int portionWritten;
+	private int accessedTimes;
 	private volatile long count = 0;
-//	private long countLastWritten = 0;
 	private long countLastRead = 0;
 	private Thread writer = null;
 
@@ -13,8 +11,7 @@ public class PortionedVolatileCounterImpl implements Counter {
 
 	private PortionedVolatileCounterImpl(int portion) {
 		this.portion = portion;
-		// (portion + 1) >> 1;
-		portionRead = this.portion;
+		accessedTimes = this.portion;
 	}
 
 	@Override
@@ -24,24 +21,24 @@ public class PortionedVolatileCounterImpl implements Counter {
 
 	@Override
 	public void increment() {
-//		if (++countReal - countLastWritten >= portion)
-//			count = countLastWritten = countReal;
 		++countReal;
-		if(writer == null )writer = Thread.currentThread();
-		if ( portionWritten-- <= 0) {
-			portionWritten = portion;
+		if (writer == null)
+			writer = Thread.currentThread(); // Only one thread must increment
+		if (mustFlush())
 			count = countReal;
-		}
 	}
 
 	@Override
 	public long get() {
-		if (portionRead-- > 0)
-			return countLastRead;
-		else {
-			portionRead = portion;
-			return countLastRead = count;
-		}
+		return (writer != null && writer == Thread.currentThread()) ? countReal : mustFlush() ? (countLastRead = count)
+				: countLastRead < countReal ? (countLastRead = countReal) : countLastRead;
+	}
+
+	private boolean mustFlush() {
+		final boolean must = --accessedTimes < 0;
+		if (must)
+			accessedTimes = portion;
+		return must;
 	}
 
 }
