@@ -16,6 +16,7 @@ import java.util.stream.Collectors;
 
 public class Utils {
 
+	@FunctionalInterface
 	public static interface ThrowingConsumer<T> extends Consumer<T> {
 		@Override
 		default void accept(final T elem) {
@@ -29,6 +30,7 @@ public class Utils {
 		void throwingAccept(T elem) throws Exception;
 	}
 
+	@FunctionalInterface
 	public static interface ThrowingFunction<T, R> extends Function<T, R> {
 		@Override
 		default R apply(final T elem) {
@@ -186,4 +188,20 @@ public class Utils {
 	public static <C> AbstractList<C> list (IntFunction<C> item, int size){
 		return list(item, ()->size);
 	}
+	
+	public static <T> Iterator<T> counted(Iterator<T> iterator, Counter counter){
+		return new Iterator<T>() {
+
+			@Override
+			public boolean hasNext() {
+				return iterator.hasNext();
+			}
+
+			@Override
+			public T next() {
+				counter.increment();
+				return iterator.next();
+			}
+		};
+	} 
 }
