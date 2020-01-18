@@ -14,14 +14,6 @@ public class ValueDescriptor {
 		this.descriptor = descriptor;
 	}
 	
-	public void set(PreparedStatement preparedStatement) throws SQLException {
-		descriptor.set(preparedStatement, value);
-	}
-
-	public static ValueDescriptor create(ResultSet resultSet, ColumnDescriptor descriptor) throws SQLException {
-		return new ValueDescriptor(descriptor.get(resultSet), descriptor);
-	}
-	
 	
 
 }

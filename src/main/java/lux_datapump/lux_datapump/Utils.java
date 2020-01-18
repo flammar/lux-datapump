@@ -79,9 +79,9 @@ public class Utils {
 			}
 
 			private List<ValueDescriptor> rowToList() {
-				return descs.stream().map(c -> {
+				return descs.stream().map(cd -> {
 					try {
-						return ValueDescriptor.create(src, c);
+						return new ValueDescriptor(cd.getter.perform(src, cd.srcIndex), cd);
 					} catch (SQLException e) {
 						e.printStackTrace();
 						return null;
