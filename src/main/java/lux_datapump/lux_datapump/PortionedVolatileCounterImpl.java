@@ -9,9 +9,13 @@ public class PortionedVolatileCounterImpl implements Counter {
 
 	private long countReal = 0;
 
-	private PortionedVolatileCounterImpl(int portion) {
+	public PortionedVolatileCounterImpl(int portion) {
 		this.portion = portion;
 		accessedTimes = this.portion;
+	}
+
+	public PortionedVolatileCounterImpl() {
+		this(100);
 	}
 
 	@Override
